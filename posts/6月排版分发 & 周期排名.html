@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>排版分发 & 周期排名 · 综合看板</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f4f7fc;
+      color: #1e293b;
+      padding: 24px;
+    }
+    .container { max-width: 1440px; margin: 0 auto; }
+    h1 {
+      font-weight: 600;
+      font-size: 2rem;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+      border-bottom: 2px solid #d0dbe8;
+      padding-bottom: 16px;
+    }
+    h1 small {
+      font-size: 1rem;
+      font-weight: 400;
+      color: #475569;
+      margin-left: 8px;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0, 20, 40, 0.06);
+      padding: 20px 18px 18px;
+      border: 1px solid #e9edf2;
+      margin-bottom: 28px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .card-header h3 {
+      font-weight: 600;
+      font-size: 1.2rem;
+      color: #0b2b44;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-header i { color: #3b82f6; width: 22px; text-align: center; }
+    .badge-year {
+      border-radius: 40px;
+      padding: 4px 14px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-year.year-2025 { background: #dbeafe; color: #1e4b8f; }
+    .badge-year.year-2026 { background: #d1fae5; color: #0b6e4f; }
+    .badge-period { background: #fef3c7; color: #92400e; }
+
+    /* 表格字号调节 */
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .font-size-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f1f5f9;
+      padding: 4px 12px 4px 16px;
+      border-radius: 40px;
+    }
+    .font-size-control label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #334155;
+    }
+    .font-size-control button {
+      background: white;
+      border: 1px solid #d0d8e3;
+      border-radius: 30px;
+      width: 30px;
+      height: 30px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: 0.1s;
+      color: #1e293b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .font-size-control button:hover { background: #e9edf2; }
+    .font-size-control .size-display {
+      min-width: 40px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 16px;
+      border: 1px solid #eef2f6;
+      transition: all 0.1s;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      min-width: 820px;
+    }
+    th {
+      background: #f8fafc;
+      text-align: center;
+      padding: 12px 10px;
+      font-weight: 600;
+      color: #1e3a5f;
+      border-bottom: 1px solid #dce3ec;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    th:hover { background: #eef2f6; }
+    th .sort-icon {
+      margin-left: 6px;
+      font-size: 0.7rem;
+      opacity: 0.6;
+    }
+    td {
+      padding: 10px 10px;
+      border-bottom: 1px solid #eef2f6;
+      vertical-align: middle;
+      text-align: center;
+      transition: background-color 0.15s ease, font-size 0.15s ease;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    /* ===== 行悬停效果 ===== */
+    tbody tr:hover td {
+      background-color: #e8f0fe !important;
+      font-size: 1.1em !important;
+      cursor: default;
+    }
+    /* 汇总行悬停也生效，但保留其背景色 */
+    tfoot tr:hover td {
+      background-color: #e8f0fe !important;
+      font-size: 1.1em !important;
+      cursor: default;
+    }
+    /* 确保表头不受影响 */
+    thead tr:hover th {
+      background-color: #f8fafc !important;
+      font-size: inherit !important;
+    }
+
+    /* 完成率颜色规则 */
+    .rate-green { color: #0b7e4b; font-weight: 600; }
+    .rate-mid { color: #b45309; font-weight: 600; }
+
+    /* 周期颜色规则 */
+    .period-green { color: #0b7e4b; font-weight: 600; }
+    .period-mid { color: #b45309; font-weight: 600; }
+    .period-black { color: #1e293b; font-weight: 600; }
+
+    .done-badge {
+      background: #f1f5f9;
+      border-radius: 30px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: inline-block;
+    }
+    .stat-badge {
+      background: #f1f5f9;
+      border-radius: 40px;
+      padding: 6px 16px;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-number { font-weight: 700; color: #0f2b45; }
+    .summary-row {
+      background: #f8fafc;
+      font-weight: 600;
+      border-top: 2px solid #d0dbe8;
+    }
+    .summary-row td { padding: 12px 10px; }
+
+    .chart-grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+    .chart-container {
+      position: relative;
+      height: 220px;
+      max-height: 260px;
+      margin: 4px 0 10px 0;
+    }
+    .chart-container.pie-chart { height: 200px; max-height: 220px; }
+    .full-width-chart {
+      width: 100%;
+      height: 230px;
+      max-height: 260px;
+    }
+    .flex-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+    .pie-legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 4px;
+      font-size: 0.8rem;
+    }
+    .pie-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-color {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 4px;
+    }
+    .footer-note {
+      margin-top: 20px;
+      color: #64748b;
+      font-size: 0.85rem;
+      border-top: 1px solid #dce3ec;
+      padding-top: 18px;
+      text-align: right;
+    }
+
+    /* 周期表格专用：全部居中 */
+    #periodTable th,
+    #periodTable td {
+      text-align: center;
+      vertical-align: middle;
+    }
+    /* 完成率表格：第一列左对齐，其余居中 */
+    #rateTable th:first-child,
+    #rateTable td:first-child {
+      text-align: left;
+    }
+    #rateTable th:not(:first-child),
+    #rateTable td:not(:first-child) {
+      text-align: center;
+    }
+
+    @media (max-width: 800px) {
+      .chart-grid-2col { grid-template-columns: 1fr; gap: 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1><i class="fas fa-layer-group" style="color: #2563eb;"></i> 排版分发 & 周期排名 <small>2025-2026 半年数据 + 周期效率</small></h1>
+
+  <!-- ========================================================= -->
+  <!-- 第一部分：各厂完成率明细 -->
+  <div class="card">
+    <div class="card-header">
+      <h3><i class="fas fa-table"></i> 各厂完成率明细 · 含已完成品种</h3>
+      <div class="table-toolbar">
+        <div class="font-size-control">
+          <label><i class="fas fa-font"></i> 字号</label>
+          <button class="fontDecBtn">−</button>
+          <span class="size-display">0.85rem</span>
+          <button class="fontIncBtn">+</button>
+        </div>
+        <span><i class="far fa-calendar-alt"></i> 2025 / 2026 对比</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="rateTable" class="sortable-table">
+        <thead>
+          <tr>
+            <th data-col="0">排厂 <span class="sort-icon">⇅</span></th>
+            <th data-col="1">2025计划 <span class="sort-icon">⇅</span></th>
+            <th data-col="2">2025已完成 <span class="sort-icon">⇅</span></th>
+            <th data-col="3">2025完成率 <span class="sort-icon">⇅</span></th>
+            <th data-col="4">2026计划 <span class="sort-icon">⇅</span></th>
+            <th data-col="5">2026已完成 <span class="sort-icon">⇅</span></th>
+            <th data-col="6">2026完成率 <span class="sort-icon">⇅</span></th>
+          </tr>
+        </thead>
+        <tbody id="rateTableBody"></tbody>
+        <tfoot id="summaryFoot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 第二部分：折线图 (全宽) -->
+  <div class="card">
+    <div class="card-header">
+      <h3><i class="fas fa-chart-line"></i> 完成率对比 · 折线 (全宽)</h3>
+      <span><span class="badge-year year-2025">2025</span><span class="badge-year year-2026" style="margin-left:4px;">2026</span></span>
+    </div>
+    <div class="full-width-chart"><canvas id="rateLineChart" width="800" height="230"></canvas></div>
+    <div class="flex-row" style="justify-content: space-between; margin-top: 6px;">
+      <span class="stat-badge"><i class="far fa-calendar-alt"></i> 2025 平均完成率 <span class="stat-number" id="avg2025">—</span></span>
+      <span class="stat-badge"><i class="far fa-calendar-alt"></i> 2026 平均完成率 <span class="stat-number" id="avg2026">—</span></span>
+      <span class="stat-badge"><i class="fas fa-arrow-up"></i> 变化 <span class="stat-number" id="deltaRate">—</span></span>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 第三部分：饼图 2025 + 2026 并排 -->
+  <div class="chart-grid-2col">
+    <div class="card">
+      <div class="card-header"><h3><i class="fas fa-chart-pie"></i> 软件分类占比 · 2025</h3><span class="badge-year year-2025">2025</span></div>
+      <div class="chart-container pie-chart"><canvas id="pie2025Chart" width="200" height="200"></canvas></div>
+      <div class="pie-legend"><span><span class="legend-color" style="background:#3b82f6;"></span> 方正</span><span><span class="legend-color" style="background:#f59e0b;"></span> InDesign</span><span><span class="legend-color" style="background:#10b981;"></span> Word</span></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3><i class="fas fa-chart-pie"></i> 软件分类占比 · 2026</h3><span class="badge-year year-2026">2026</span></div>
+      <div class="chart-container pie-chart"><canvas id="pie2026Chart" width="200" height="200"></canvas></div>
+      <div class="pie-legend"><span><span class="legend-color" style="background:#3b82f6;"></span> 方正</span><span><span class="legend-color" style="background:#f59e0b;"></span> InDesign</span><span><span class="legend-color" style="background:#10b981;"></span> Word</span></div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 第四部分：定点排版单位周期排名 -->
+  <div class="card">
+    <div class="card-header">
+      <h3><i class="fas fa-clock"></i> 定点排版单位周期排名 · 2026上半年</h3>
+      <div class="table-toolbar">
+        <div class="font-size-control">
+          <label><i class="fas fa-font"></i> 字号</label>
+          <button class="fontDecBtn">−</button>
+          <span class="size-display">0.85rem</span>
+          <button class="fontIncBtn">+</button>
+        </div>
+        <span class="badge-period"><i class="far fa-calendar-alt"></i> 周期统计</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="periodTable" class="sortable-table">
+        <thead>
+          <tr>
+            <th data-col="0" style="text-align:center; vertical-align:middle;">排厂 <span class="sort-icon">⇅</span></th>
+            <th colspan="2" style="text-align:center; vertical-align:middle;">单黑 &lt;50万字</th>
+            <th colspan="2" style="text-align:center; vertical-align:middle;">单黑 &gt;50万字</th>
+            <th colspan="2" style="text-align:center; vertical-align:middle;">双色/四色</th>
+            <th data-col="7" style="text-align:center; vertical-align:middle;">总平均周期 <span class="sort-icon">⇅</span></th>
+          </tr>
+          <tr style="background:#f8fafc; font-weight:500;">
+            <th style="text-align:center; vertical-align:middle;"></th>
+            <th data-col="1" style="text-align:center; vertical-align:middle;">品种 <span class="sort-icon">⇅</span></th>
+            <th data-col="2" style="text-align:center; vertical-align:middle;">周期 <span class="sort-icon">⇅</span></th>
+            <th data-col="3" style="text-align:center; vertical-align:middle;">品种 <span class="sort-icon">⇅</span></th>
+            <th data-col="4" style="text-align:center; vertical-align:middle;">周期 <span class="sort-icon">⇅</span></th>
+            <th data-col="5" style="text-align:center; vertical-align:middle;">品种 <span class="sort-icon">⇅</span></th>
+            <th data-col="6" style="text-align:center; vertical-align:middle;">周期 <span class="sort-icon">⇅</span></th>
+            <th style="text-align:center; vertical-align:middle;"></th>
+          </tr>
+        </thead>
+        <tbody id="periodTableBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top: 14px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
+      <span class="stat-badge"><i class="fas fa-trophy"></i> 最优平均周期 <span class="stat-number" id="bestAvgPeriod">—</span></span>
+      <span class="stat-badge"><i class="fas fa-chart-simple"></i> 平均周期中位数 <span class="stat-number" id="medianPeriod">—</span></span>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <i class="fas fa-database"></i> 数据基于 2025/2026 半年排版分发 + 2026上半年周期统计 · 点击表格标题可排序 · 悬停行高亮放大
+  </div>
+</div>
+
+<script>
+  (function() {
+    // =============================================================
+    // 1. 原有分发数据
+    const data2025 = {
+      factories: [
+        { name: '汉魂', plan: 425, done: 270, rate: 63.5 },
+        { name: '科印', plan: 410, done: 242, rate: 59.0 },
+        { name: '聚拓', plan: 314, done: 195, rate: 62.1 },
+        { name: '龙达', plan: 257, done: 176, rate: 68.5 },
+        { name: '顺浩', plan: 162, done: 129, rate: 79.6 },
+        { name: '佳捷真', plan: 79, done: 59, rate: 74.7 },
+        { name: '科印-溢思排版', plan: 78, done: 44, rate: 56.4 },
+        { name: '砚祥志远', plan: 92, done: 82, rate: 89.1 },
+        { name: '华瑞海通', plan: 35, done: 2, rate: 5.7 },
+        { name: '梧桐影', plan: 40, done: 38, rate: 95.0 },
+        { name: '特约', plan: 194, done: 99, rate: 51.0 }
+      ],
+      software: {
+        '方正': [115,85,97,144,81,40,0,38,0,0,0].reduce((a,b)=>a+b,0),
+        'InDesign': [120,137,65,32,24,15,44,28,0,38,99].reduce((a,b)=>a+b,0),
+        'word': [35,20,33,0,24,4,0,16,2,0,0].reduce((a,b)=>a+b,0)
+      }
+    };
+    const data2026 = {
+      factories: [
+        { name: '汉魂', plan: 440, done: 307, rate: 69.8 },
+        { name: '科印', plan: 400, done: 158, rate: 39.5 },
+        { name: '聚拓', plan: 320, done: 210, rate: 65.6 },
+        { name: '龙达', plan: 270, done: 201, rate: 74.4 },
+        { name: '顺浩', plan: 160, done: 112, rate: 70.0 },
+        { name: '佳捷真', plan: 80, done: 51, rate: 63.8 },
+        { name: '科印-溢思排版', plan: 60, done: 48, rate: 80.0 },
+        { name: '砚祥志远', plan: 150, done: 109, rate: 72.7 },
+        { name: '华瑞海通', plan: 80, done: 30, rate: 37.5 },
+        { name: '梧桐影', plan: 60, done: 57, rate: 95.0 },
+        { name: '特约', plan: 194, done: 136, rate: 70.1 }
+      ],
+      software: {
+        '方正': [118,75,115,161,84,28,0,48,23,4,2].reduce((a,b)=>a+b,0),
+        'InDesign': [172,76,89,40,24,23,48,52,1,53,134].reduce((a,b)=>a+b,0),
+        'word': [17,7,6,0,4,0,0,9,6,0,0].reduce((a,b)=>a+b,0)
+      }
+    };
+
+    // ---------- 渲染完成率表格 ----------
+    const tbody = document.getElementById('rateTableBody');
+    const tfoot = document.getElementById('summaryFoot');
+    let rateData = [];
+
+    function buildRateData() {
+      rateData = data2025.factories.map((f, idx) => {
+        const f26 = data2026.factories[idx];
+        return {
+          name: f.name,
+          plan25: f.plan,
+          done25: f.done,
+          rate25: f.rate,
+          plan26: f26.plan,
+          done26: f26.done,
+          rate26: f26.rate
+        };
+      });
+    }
+    buildRateData();
+
+    // 完成率颜色判断：<60% 或 >80% 为 rate-mid (橙色)，60%~80% 为 rate-green (绿色)
+    function getRateClass(rate) {
+      if (rate < 60 || rate > 80) return 'rate-mid';
+      return 'rate-green';
+    }
+
+    function renderRateTable(data) {
+      const rows = data.map(d => `<tr>
+        <td style="text-align:left;"><strong>${d.name}</strong></td>
+        <td>${d.plan25}</td>
+        <td><span class="done-badge">${d.done25}</span></td>
+        <td><span class="${getRateClass(d.rate25)}">${d.rate25}%</span></td>
+        <td>${d.plan26}</td>
+        <td><span class="done-badge">${d.done26}</span></td>
+        <td><span class="${getRateClass(d.rate26)}">${d.rate26}%</span></td>
+      </tr>`);
+      tbody.innerHTML = rows.join('');
+      const totalPlan25 = data.reduce((s, d) => s + d.plan25, 0);
+      const totalDone25 = data.reduce((s, d) => s + d.done25, 0);
+      const totalPlan26 = data.reduce((s, d) => s + d.plan26, 0);
+      const totalDone26 = data.reduce((s, d) => s + d.done26, 0);
+      const r25 = (totalDone25 / totalPlan25 * 100);
+      const r26 = (totalDone26 / totalPlan26 * 100);
+      tfoot.innerHTML = `<tr class="summary-row">
+        <td style="text-align:left;">📊 汇总</td>
+        <td>${totalPlan25}</td>
+        <td>${totalDone25}</td>
+        <td class="${getRateClass(r25)}">${r25.toFixed(1)}%</td>
+        <td>${totalPlan26}</td>
+        <td>${totalDone26}</td>
+        <td class="${getRateClass(r26)}">${r26.toFixed(1)}%</td>
+      </tr>`;
+    }
+    renderRateTable(rateData);
+
+    // ---------- 周期表格数据 ----------
+    const periodData = [
+      { name: '龙达', singleSmall: { count: 126, period: 4.1 }, singleLarge: { count: 31, period: 5.8 }, color: { count: 29, period: 5.9 }, avgPeriod: 4.7 },
+      { name: '砚祥志远', singleSmall: { count: 53, period: 6.9 }, singleLarge: { count: 4, period: 6.5 }, color: { count: 45, period: 7.3 }, avgPeriod: 7.1 },
+      { name: '科印-溢思排版', singleSmall: { count: 10, period: 11.3 }, singleLarge: { count: 1, period: 6 }, color: { count: 38, period: 13 }, avgPeriod: 12.6 },
+      { name: '科印排版', singleSmall: { count: 83, period: 14.9 }, singleLarge: { count: 13, period: 15.8 }, color: { count: 58, period: 14.1 }, avgPeriod: 14.7 },
+      { name: '汉魂', singleSmall: { count: 140, period: 10.4 }, singleLarge: { count: 39, period: 10.5 }, color: { count: 111, period: 10.7 }, avgPeriod: 10.6 },
+      { name: '聚拓', singleSmall: { count: 125, period: 12.5 }, singleLarge: { count: 18, period: 13.1 }, color: { count: 50, period: 12.9 }, avgPeriod: 12.7 },
+      { name: '华瑞海通', singleSmall: { count: 25, period: 9.3 }, singleLarge: { count: 2, period: 10.5 }, color: { count: 0, period: null }, avgPeriod: 9.4 },
+      { name: '佳捷真', singleSmall: { count: 32, period: 10.3 }, singleLarge: { count: 5, period: 12.8 }, color: { count: 8, period: 12 }, avgPeriod: 10.7 },
+      { name: '顺浩', singleSmall: { count: 64, period: 15.2 }, singleLarge: { count: 4, period: 12.8 }, color: { count: 33, period: 15.4 }, avgPeriod: 15.2 },
+      { name: '梧桐影', singleSmall: { count: 11, period: 10.8 }, singleLarge: { count: 0, period: null }, color: { count: 44, period: 13.4 }, avgPeriod: 12.9 }
+    ];
+
+    // 周期颜色判断：>14 为 period-mid (橙色)，<10 为 period-green (绿色)，其他 period-black (黑色)
+    function getPeriodClass(period) {
+      if (period > 14) return 'period-mid';
+      if (period < 10) return 'period-green';
+      return 'period-black';
+    }
+
+    const periodTbody = document.getElementById('periodTableBody');
+    function renderPeriodTable(data) {
+      periodTbody.innerHTML = data.map(p => `<tr>
+        <td><strong>${p.name}</strong></td>
+        <td>${p.singleSmall.count}</td><td>${p.singleSmall.period}</td>
+        <td>${p.singleLarge.count}</td><td>${p.singleLarge.period ?? '-'}</td>
+        <td>${p.color.count}</td><td>${p.color.period ?? '-'}</td>
+        <td><span class="${getPeriodClass(p.avgPeriod)}">${p.avgPeriod}</span></td>
+      </tr>`).join('');
+    }
+    renderPeriodTable(periodData);
+
+    // ---------- 周期统计摘要 ----------
+    const periods = periodData.map(p => p.avgPeriod);
+    const best = Math.min(...periods);
+    const sorted = [...periods].sort((a,b) => a-b);
+    const median = sorted.length % 2 === 0 ? (sorted[sorted.length/2-1] + sorted[sorted.length/2])/2 : sorted[Math.floor(sorted.length/2)];
+    document.getElementById('bestAvgPeriod').textContent = best;
+    document.getElementById('medianPeriod').textContent = median.toFixed(1);
+
+    // =============================================================
+    // 2. 通用排序功能
+    function makeSortable(table) {
+      const headers = table.querySelectorAll('th[data-col]');
+      headers.forEach(th => {
+        th.addEventListener('click', function() {
+          const colIdx = parseInt(this.dataset.col);
+          const tbody = table.querySelector('tbody');
+          const rows = Array.from(tbody.querySelectorAll('tr'));
+          let firstVal = rows[0]?.children[colIdx]?.textContent?.trim() || '';
+          let rowIndex = 0;
+          while ((firstVal === '-' || firstVal === '' || firstVal === '—') && rowIndex < rows.length - 1) {
+            rowIndex++;
+            firstVal = rows[rowIndex]?.children[colIdx]?.textContent?.trim() || '';
+          }
+          const isNumeric = !isNaN(parseFloat(firstVal.replace(/%/g,'').replace(/[^0-9.\-]/g,'')));
+
+          const ascending = this.dataset.sortDir !== 'asc';
+          this.dataset.sortDir = ascending ? 'asc' : 'desc';
+          headers.forEach(h => { if (h !== this) h.dataset.sortDir = ''; });
+
+          rows.sort((a, b) => {
+            let valA = a.children[colIdx]?.textContent?.trim() || '';
+            let valB = b.children[colIdx]?.textContent?.trim() || '';
+            if (isNumeric) {
+              const cleanA = parseFloat(valA.replace(/%/g,'').replace(/[^0-9.\-]/g,'')) || 0;
+              const cleanB = parseFloat(valB.replace(/%/g,'').replace(/[^0-9.\-]/g,'')) || 0;
+              return ascending ? cleanA - cleanB : cleanB - cleanA;
+            } else {
+              return ascending ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+          });
+
+          rows.forEach(row => tbody.appendChild(row));
+          headers.forEach(h => {
+            const icon = h.querySelector('.sort-icon');
+            if (h === this) {
+              icon.textContent = ascending ? '▲' : '▼';
+            } else {
+              icon.textContent = '⇅';
+            }
+          });
+        });
+      });
+    }
+
+    document.querySelectorAll('.sortable-table').forEach(makeSortable);
+
+    // =============================================================
+    // 3. 字号调节功能
+    document.querySelectorAll('.font-size-control').forEach(ctrl => {
+      const decBtn = ctrl.querySelector('.fontDecBtn');
+      const incBtn = ctrl.querySelector('.fontIncBtn');
+      const display = ctrl.querySelector('.size-display');
+      const card = ctrl.closest('.card');
+      const table = card ? card.querySelector('table') : null;
+      if (!table) return;
+      let size = 0.85;
+      function applySize(s) {
+        table.style.fontSize = s + 'rem';
+        display.textContent = s.toFixed(2) + 'rem';
+      }
+      decBtn.addEventListener('click', function() { if (size > 0.5) { size = Math.round((size - 0.05) * 100) / 100; applySize(size); } });
+      incBtn.addEventListener('click', function() { if (size < 1.8) { size = Math.round((size + 0.05) * 100) / 100; applySize(size); } });
+      applySize(size);
+    });
+
+    // =============================================================
+    // 4. 图表
+    const rates2025 = data2025.factories.map(f => f.rate);
+    const rates2026 = data2026.factories.map(f => f.rate);
+    const avg25 = rates2025.reduce((a,b)=>a+b,0) / rates2025.length;
+    const avg26 = rates2026.reduce((a,b)=>a+b,0) / rates2026.length;
+    document.getElementById('avg2025').textContent = avg25.toFixed(1) + '%';
+    document.getElementById('avg2026').textContent = avg26.toFixed(1) + '%';
+    const delta = avg26 - avg25;
+    const deltaEl = document.getElementById('deltaRate');
+    deltaEl.textContent = (delta > 0 ? '+' : '') + delta.toFixed(1) + '%';
+    deltaEl.style.color = delta >= 0 ? '#0b7e4b' : '#b91c1c';
+
+    const ctxLine = document.getElementById('rateLineChart').getContext('2d');
+    const labels = data2025.factories.map(f => f.name.length > 6 ? f.name.slice(0,4)+'…' : f.name);
+    new Chart(ctxLine, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: '2025 完成率', data: rates2025, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.08)', tension: 0.2, pointBackgroundColor: '#2563eb', pointRadius: 4, fill: true },
+          { label: '2026 完成率', data: rates2026, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)', tension: 0.2, pointBackgroundColor: '#10b981', pointRadius: 4, borderDash: [5, 4], fill: true }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 10 } } } }, scales: { y: { beginAtZero: true, max: 100, grid: { color: '#e9edf2' } }, x: { grid: { display: false } } } }
+    });
+
+    new Chart(document.getElementById('pie2025Chart').getContext('2d'), { type: 'pie', data: { labels: ['方正','InDesign','Word'], datasets: [{ data: [data2025.software['方正'], data2025.software['InDesign'], data2025.software['word']], backgroundColor: ['#3b82f6','#f59e0b','#10b981'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+    new Chart(document.getElementById('pie2026Chart').getContext('2d'), { type: 'pie', data: { labels: ['方正','InDesign','Word'], datasets: [{ data: [data2026.software['方正'], data2026.software['InDesign'], data2026.software['word']], backgroundColor: ['#3b82f6','#f59e0b','#10b981'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+
+  })();
+</script>
+</body>
+</html>

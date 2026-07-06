@@ -438,3 +438,9 @@ def build():
 
 if __name__ == '__main__':
     build()
+
+
+'''
+cd docs
+python -m http.server 8000
+'''

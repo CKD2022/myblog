@@ -6,7 +6,7 @@ echo ========================================
 echo.
 
 echo [1/4] 正在生成网站...
-python build.py
+D:\djangoProject\untitled\venv\Scripts\python.exe build.py
 if %errorlevel% neq 0 (
     echo [错误] 生成失败！
     pause
